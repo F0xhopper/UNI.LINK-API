@@ -21,6 +21,36 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   },
 });
+// Function to create a list
+async function createList(listData) {
+  try {
+    // Ensure client is connected before running operations
+    if (!client.topology || !client.topology.isConnected()) {
+      await client.connect();
+    }
+    const listsCollection = client.db("Cluster0").collection("lists");
+    const result = await listsCollection.insertOne(listData);
+    return result;
+  } catch (error) {
+    console.error("Error creating list:", error);
+    throw error; // Rethrow the error to be caught by the calling function
+  }
+}
+
+// Route to handle list creation
+app.post("/lists", async (req, res) => {
+  try {
+    const newList = req.body; // Assuming the request body contains list data
+    const result = await createList(newList);
+    res.status(201).json({
+      message: "List created successfully",
+      listId: result.insertedId,
+    });
+  } catch (error) {
+    console.error("Failed to create list:", error);
+    res.status(500).json({ message: "Failed to create list" });
+  }
+});
 
 // Function to create a user account
 async function createUser(userData) {
@@ -106,7 +136,7 @@ async function run() {
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
     // Start the server after successful connection
-    const PORT = process.env.PORT || 3012;
+    const PORT = process.env.PORT || 3013;
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });
