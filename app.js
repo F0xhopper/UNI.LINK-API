@@ -1,6 +1,6 @@
 // Import required modules
 import express from "express";
-import { MongoClient, ServerApiVersion } from "mongodb";
+import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 import bodyParser from "body-parser";
 import cors from "cors";
 
@@ -57,6 +57,29 @@ app.post("/login", async (req, res) => {
     res.status(500).json({ message: "Failed to login user" });
   }
 });
+// Route to fetch user data based on user ID
+app.get("/users/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    // Convert userId string to ObjectId
+    const objectId = new ObjectId(userId);
+
+    const usersCollection = client.db("Cluster0").collection("users");
+
+    // Query the database using ObjectId
+    const user = await usersCollection.findOne({ _id: objectId });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Failed to fetch user data:", error);
+    res.status(500).json({ message: "Failed to fetch user data" });
+  }
+});
 // Route to handle user creation
 app.post("/users", async (req, res) => {
   try {
@@ -83,7 +106,7 @@ async function run() {
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
     // Start the server after successful connection
-    const PORT = process.env.PORT || 3059;
+    const PORT = process.env.PORT || 3012;
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });
