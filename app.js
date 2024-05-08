@@ -51,7 +51,64 @@ app.post("/lists", async (req, res) => {
     res.status(500).json({ message: "Failed to create list" });
   }
 });
+async function getListById(listId) {
+  try {
+    // Ensure client is connected before running operations
+    if (!client.topology || !client.topology.isConnected()) {
+      await client.connect();
+    }
+    const listsCollection = client.db("Cluster0").collection("lists");
+    const userList = await listsCollection.findOne({
+      _id: listId,
+    });
+    return userList;
+  } catch (error) {
+    console.error("Error fetching list by ID:", error);
+    throw error; // Rethrow the error to be caught by the calling function
+  }
+}
+app.get("/list/:listId", async (req, res) => {
+  try {
+    const listId = req.params.listId;
 
+    const userList = await getListById(new ObjectId(listId));
+
+    if (!userList) {
+      res.status(404).json({ message: "List not found" });
+    } else {
+      res.status(200).json(userList);
+    }
+  } catch (error) {
+    console.error("Failed to fetch list by ID:", error);
+    res.status(500).json({ message: "Failed to fetch list by ID" });
+  }
+});
+async function getUserLists(userId) {
+  try {
+    // Ensure client is connected before running operations
+    if (!client.topology || !client.topology.isConnected()) {
+      await client.connect();
+    }
+    const listsCollection = client.db("Cluster0").collection("lists");
+    const userLists = await listsCollection.find({ userId: userId }).toArray();
+    return userLists;
+  } catch (error) {
+    console.error("Error fetching user lists:", error);
+    throw error; // Rethrow the error to be caught by the calling function
+  }
+}
+
+// Route to fetch all lists associated with a specific user ID
+app.get("/lists/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const userLists = await getUserLists(userId);
+    res.status(200).json(userLists);
+  } catch (error) {
+    console.error("Failed to fetch user lists:", error);
+    res.status(500).json({ message: "Failed to fetch user lists" });
+  }
+});
 // Function to create a user account
 async function createUser(userData) {
   try {
