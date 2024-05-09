@@ -3,7 +3,8 @@ import express from "express";
 import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 import bodyParser from "body-parser";
 import cors from "cors";
-
+import axios from "axios";
+import cheerio from "cheerio";
 // Create Express app
 const app = express();
 app.use(bodyParser.json());
@@ -21,6 +22,107 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   },
 });
+async function addCommentToList(listId, commentData) {
+  try {
+    if (!client.topology || !client.topology.isConnected()) {
+      await client.connect();
+    }
+    const listsCollection = client.db("Cluster0").collection("lists");
+
+    const result = await listsCollection.updateOne(
+      { _id: listId },
+      { $push: { comments: commentData } }
+    );
+    return result;
+  } catch (error) {
+    console.error("Error adding comment to list:", error);
+    throw error;
+  }
+}
+app.post("/lists/:listId/comments", async (req, res) => {
+  try {
+    const listId = new ObjectId(req.params.listId);
+    const commentData = req.body;
+    const result = await addCommentToList(listId, commentData);
+    res.status(201).json({ message: "Comment added to the list", result });
+  } catch (error) {
+    console.error("Failed to add comment to list:", error);
+    res.status(500).json({ message: "Failed to add comment to list" });
+  }
+});
+async function addLikeToList(listId, username) {
+  try {
+    if (!client.topology || !client.topology.isConnected()) {
+      await client.connect();
+    }
+    const listsCollection = client.db("Cluster0").collection("lists");
+
+    const result = await listsCollection.updateOne(
+      { _id: listId },
+      { $push: { likes: username } } // Use $addToSet to add username only if it's not already in the array
+    );
+    return result;
+  } catch (error) {
+    console.error("Error adding like to list:", error);
+    throw error;
+  }
+}
+app.post("/lists/:listId/like", async (req, res) => {
+  try {
+    const listId = new ObjectId(req.params.listId);
+    const { username } = req.body; // Assuming the username is sent in the request body
+    const result = await addLikeToList(listId, username);
+    res.status(201).json({ message: "Like added to the list", result });
+  } catch (error) {
+    console.error("Failed to add like to list:", error);
+    res.status(500).json({ message: "Failed to add like to list" });
+  }
+});
+async function getPageTitle(url) {
+  try {
+    const response = await axios.get(url);
+    const $ = cheerio.load(response.data);
+    const title = $("title").text();
+
+    return title;
+  } catch (error) {
+    console.error("Error retrieving page title:", error);
+    throw error;
+  }
+}
+async function addLinkToList(listId, linkData) {
+  try {
+    if (!client.topology || !client.topology.isConnected()) {
+      await client.connect();
+    }
+    const listsCollection = client.db("Cluster0").collection("lists");
+    const title = await getPageTitle(linkData.link_url);
+    linkData.link_name = title;
+
+    const result = await listsCollection.updateOne(
+      { _id: listId },
+      { $push: { links: linkData } }
+    );
+    return result;
+  } catch (error) {
+    console.error("Error adding link to list:", error);
+    throw error;
+  }
+}
+
+// Route to handle adding a new link to a list
+app.post("/lists/:listId/links", async (req, res) => {
+  try {
+    const listId = new ObjectId(req.params.listId);
+    const linkData = req.body;
+    const result = await addLinkToList(listId, linkData);
+    res.status(201).json({ message: "Link added to the list", result });
+  } catch (error) {
+    console.error("Failed to add link to list:", error);
+    res.status(500).json({ message: "Failed to add link to list" });
+  }
+});
+
 // Function to create a list
 async function createList(listData) {
   try {
