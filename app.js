@@ -7,7 +7,7 @@ import axios from "axios";
 import cheerio from "cheerio";
 // Create Express app
 const app = express();
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: "10mb" }));
 app.use(cors());
 
 // MongoDB connection URI
@@ -59,7 +59,7 @@ async function addLikeToList(listId, username) {
 
     const result = await listsCollection.updateOne(
       { _id: listId },
-      { $push: { likes: username } } // Use $addToSet to add username only if it's not already in the array
+      { $addToSet: { likes: username } } // Use $addToSet to add username only if it's not already in the array
     );
     return result;
   } catch (error) {
@@ -122,7 +122,40 @@ app.post("/lists/:listId/links", async (req, res) => {
     res.status(500).json({ message: "Failed to add link to list" });
   }
 });
+async function deleteLinkFromList(listId, linkUrl) {
+  try {
+    if (!client.topology || !client.topology.isConnected()) {
+      await client.connect();
+    }
+    const listsCollection = client.db("Cluster0").collection("lists");
 
+    const result = await listsCollection.updateOne(
+      { _id: listId },
+      { $pull: { links: { link_url: linkUrl } } } // Remove the link with the specified link_url
+    );
+    return result;
+  } catch (error) {
+    console.error("Error deleting link from list:", error);
+    throw error;
+  }
+}
+
+// Route to handle deleting a link from a list by its URL
+app.delete("/lists/:listId/links/:linkUrl", async (req, res) => {
+  try {
+    const listId = new ObjectId(req.params.listId);
+    const linkUrl = req.params.linkUrl;
+
+    const result = await deleteLinkFromList(listId, linkUrl);
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ message: "Link not found in the list" });
+    }
+    res.json({ message: "Link deleted from the list" });
+  } catch (error) {
+    console.error("Failed to delete link from list:", error);
+    res.status(500).json({ message: "Failed to delete link from list" });
+  }
+});
 // Function to create a list
 async function createList(listData) {
   try {
@@ -151,6 +184,46 @@ app.post("/lists", async (req, res) => {
   } catch (error) {
     console.error("Failed to create list:", error);
     res.status(500).json({ message: "Failed to create list" });
+  }
+});
+async function updateListDetails(listId, updatedData) {
+  try {
+    if (!client.topology || !client.topology.isConnected()) {
+      await client.connect();
+    }
+    const listsCollection = client.db("Cluster0").collection("lists");
+
+    const result = await listsCollection.updateOne(
+      { _id: listId },
+      {
+        $set: {
+          list_name: updatedData.name,
+          list_description: updatedData.description,
+          image: updatedData.image,
+          list_public: updateListDetails.public,
+        },
+      }
+    );
+    return result;
+  } catch (error) {
+    console.error("Error updating list details:", error);
+    throw error;
+  }
+}
+
+// Route to handle updating list details
+app.put("/lists/:listId/edit", async (req, res) => {
+  try {
+    const listId = new ObjectId(req.params.listId);
+    const updatedData = req.body;
+    const result = await updateListDetails(listId, updatedData);
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ message: "List not found" });
+    }
+    res.json({ message: "List details updated successfully" });
+  } catch (error) {
+    console.error("Failed to update list details:", error);
+    res.status(500).json({ message: "Failed to update list details" });
   }
 });
 async function getListById(listId) {
@@ -199,7 +272,34 @@ async function getUserLists(userId) {
     throw error; // Rethrow the error to be caught by the calling function
   }
 }
+async function getUserLikedLists(userId) {
+  try {
+    // Ensure client is connected before running operations
+    if (!client.topology || !client.topology.isConnected()) {
+      await client.connect();
+    }
+    const listsCollection = client.db("Cluster0").collection("lists");
+    const userLikedLists = await listsCollection
+      .find({ likes: userId })
+      .toArray();
+    return userLikedLists;
+  } catch (error) {
+    console.error("Error fetching user liked lists:", error);
+    throw error; // Rethrow the error to be caught by the calling function
+  }
+}
 
+// Route to fetch all lists liked by a specific user
+app.get("/lists/liked/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const userLikedLists = await getUserLikedLists(userId);
+    res.status(200).json(userLikedLists);
+  } catch (error) {
+    console.error("Failed to fetch user liked lists:", error);
+    res.status(500).json({ message: "Failed to fetch user liked lists" });
+  }
+});
 // Route to fetch all lists associated with a specific user ID
 app.get("/lists/:userId", async (req, res) => {
   try {
@@ -211,6 +311,34 @@ app.get("/lists/:userId", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch user lists" });
   }
 });
+async function getAllPublicLists() {
+  try {
+    // Ensure client is connected before running operations
+    if (!client.topology || !client.topology.isConnected()) {
+      await client.connect();
+    }
+    const listsCollection = client.db("Cluster0").collection("lists");
+    const publicLists = await listsCollection
+      .find({ list_public: true })
+      .toArray();
+    return publicLists;
+  } catch (error) {
+    console.error("Error fetching user lists:", error);
+    throw error; // Rethrow the error to be caught by the calling function
+  }
+}
+
+// Route to fetch all public lists
+app.get("/listss/public", async (req, res) => {
+  try {
+    const publicLists = await getAllPublicLists();
+    res.status(200).json(publicLists);
+  } catch (error) {
+    console.error("Failed to fetch public lists:", error);
+    res.status(500).json({ message: "Failed to fetch public lists" });
+  }
+});
+
 // Function to create a user account
 async function createUser(userData) {
   try {
