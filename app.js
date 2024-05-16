@@ -50,6 +50,43 @@ app.post("/lists/:listId/comments", async (req, res) => {
     res.status(500).json({ message: "Failed to add comment to list" });
   }
 });
+async function getListIdByName(listName) {
+  try {
+    if (!client.topology || !client.topology.isConnected()) {
+      await client.connect();
+    }
+    const listsCollection = client.db("Cluster0").collection("lists");
+
+    const list = await listsCollection.findOne({ list_name: listName });
+
+    if (!list) {
+      return null; // If list not found, return null
+    }
+
+    return list._id; // Return the list ID if found
+  } catch (error) {
+    console.error("Error getting list ID by name:", error);
+    throw error;
+  }
+}
+
+// Route to handle getting list ID by list name
+app.get("/lists/:listName/id", async (req, res) => {
+  try {
+    const listName = req.params.listName;
+
+    const listId = await getListIdByName(listName);
+
+    if (!listId) {
+      res.status(404).json({ message: "List not found" });
+    } else {
+      res.status(200).json({ listId: listId });
+    }
+  } catch (error) {
+    console.error("Failed to get list ID by name:", error);
+    res.status(500).json({ message: "Failed to get list ID by name" });
+  }
+});
 async function addLikeToList(listId, username) {
   try {
     if (!client.topology || !client.topology.isConnected()) {
@@ -327,7 +364,36 @@ async function getAllPublicLists() {
     throw error; // Rethrow the error to be caught by the calling function
   }
 }
+async function deleteList(listId) {
+  try {
+    if (!client.topology || !client.topology.isConnected()) {
+      await client.connect();
+    }
+    const listsCollection = client.db("Cluster0").collection("lists");
 
+    const result = await listsCollection.deleteOne({ _id: listId });
+    return result;
+  } catch (error) {
+    console.error("Error deleting list:", error);
+    throw error;
+  }
+}
+
+// Route to handle deleting a list by its ID
+app.delete("/lists/:listId/delete", async (req, res) => {
+  try {
+    const listId = new ObjectId(req.params.listId);
+
+    const result = await deleteList(listId);
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: "List not found" });
+    }
+    res.json({ message: "List deleted successfully" });
+  } catch (error) {
+    console.error("Failed to delete list:", error);
+    res.status(500).json({ message: "Failed to delete list" });
+  }
+});
 // Route to fetch all public lists
 app.get("/listss/public", async (req, res) => {
   try {
