@@ -87,32 +87,45 @@ app.get("/lists/:listName/id", async (req, res) => {
     res.status(500).json({ message: "Failed to get list ID by name" });
   }
 });
-async function addLikeToList(listId, username) {
+async function toggleLikeInList(listId, username) {
   try {
     if (!client.topology || !client.topology.isConnected()) {
       await client.connect();
     }
     const listsCollection = client.db("Cluster0").collection("lists");
 
-    const result = await listsCollection.updateOne(
-      { _id: listId },
-      { $addToSet: { likes: username } } // Use $addToSet to add username only if it's not already in the array
-    );
+    // Check if the username is already in the likes array
+    const list = await listsCollection.findOne({
+      _id: listId,
+      likes: username,
+    });
+
+    let update;
+    if (list) {
+      // If the username is in the likes array, pull it
+      update = { $pull: { likes: username } };
+    } else {
+      // If the username is not in the likes array, add it
+      update = { $addToSet: { likes: username } };
+    }
+
+    const result = await listsCollection.updateOne({ _id: listId }, update);
     return result;
   } catch (error) {
-    console.error("Error adding like to list:", error);
+    console.error("Error toggling like in list:", error);
     throw error;
   }
 }
+
 app.post("/lists/:listId/like", async (req, res) => {
   try {
     const listId = new ObjectId(req.params.listId);
     const { username } = req.body; // Assuming the username is sent in the request body
-    const result = await addLikeToList(listId, username);
-    res.status(201).json({ message: "Like added to the list", result });
+    const result = await toggleLikeInList(listId, username);
+    res.status(201).json({ message: "Like status toggled", result });
   } catch (error) {
-    console.error("Failed to add like to list:", error);
-    res.status(500).json({ message: "Failed to add like to list" });
+    console.error("Failed to toggle like in list:", error);
+    res.status(500).json({ message: "Failed to toggle like in list" });
   }
 });
 async function getPageTitle(url) {
@@ -192,6 +205,40 @@ app.delete("/lists/:listId/links/:linkUrl", async (req, res) => {
     console.error("Failed to delete link from list:", error);
     res.status(500).json({ message: "Failed to delete link from list" });
   }
+}); // Function to handle deleting a comment
+async function deleteCommentFromList(listId, username, commentText) {
+  try {
+    if (!client.topology || !client.topology.isConnected()) {
+      await client.connect();
+    }
+    const listsCollection = client.db("Cluster0").collection("lists");
+
+    const result = await listsCollection.updateOne(
+      { _id: listId },
+      { $pull: { comments: { user: username, comment: commentText } } }
+    );
+    return result;
+  } catch (error) {
+    console.error("Error deleting comment from list:", error);
+    throw error;
+  }
+}
+
+// Route to handle deleting a comment from a list
+app.delete("/lists/:listId/comments", async (req, res) => {
+  try {
+    const listId = new ObjectId(req.params.listId);
+    const username = req.body.username; // Assuming the username and commentText are sent in the request body
+    const commentText = req.body.comment;
+    const result = await deleteCommentFromList(listId, username, commentText);
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ message: "Comment not found in the list" });
+    }
+    res.json({ message: "Comment deleted from the list" });
+  } catch (error) {
+    console.error("Failed to delete comment from list:", error);
+    res.status(500).json({ message: "Failed to delete comment from list" });
+  }
 });
 // Function to create a list
 async function createList(listData) {
@@ -237,7 +284,7 @@ async function updateListDetails(listId, updatedData) {
           list_name: updatedData.name,
           list_description: updatedData.description,
           image: updatedData.image,
-          list_public: updateListDetails.public,
+          list_public: updatedData.public,
         },
       }
     );
