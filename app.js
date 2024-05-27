@@ -22,6 +22,53 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   },
 });
+async function editCommentInList(listId, username, oldComment, newComment) {
+  try {
+    if (!client.topology || !client.topology.isConnected()) {
+      await client.connect();
+    }
+    const listsCollection = client.db("Cluster0").collection("lists");
+
+    const result = await listsCollection.updateOne(
+      {
+        _id: listId,
+        "comments.user": username,
+        "comments.comment": oldComment,
+      },
+      { $set: { "comments.$.comment": newComment } }
+    );
+
+    console.log("Update result:", result);
+
+    return result;
+  } catch (error) {
+    console.error("Error editing comment in list:", error);
+    throw error;
+  }
+}
+
+app.put("/lists/:listId/comments", async (req, res) => {
+  try {
+    const listId = new ObjectId(req.params.listId);
+
+    const result = await editCommentInList(
+      listId,
+      req.body.username,
+      req.body.oldComment,
+      req.body.newComment
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Comment not found in the list" });
+    }
+
+    res.json({ message: "Comment edited successfully" });
+  } catch (error) {
+    console.error("Failed to edit comment in list:", error);
+    res.status(500).json({ message: "Failed to edit comment in list" });
+  }
+});
+
 async function addCommentToList(listId, commentData) {
   try {
     if (!client.topology || !client.topology.isConnected()) {
@@ -485,6 +532,45 @@ app.post("/login", async (req, res) => {
   } catch (error) {
     console.error("Failed to login user:", error);
     res.status(500).json({ message: "Failed to login user" });
+  }
+});
+async function editUser(userId, userDetails) {
+  try {
+    const usersCollection = client.db("Cluster0").collection("users");
+
+    const result = await usersCollection.updateOne(
+      { _id: userId },
+      {
+        $set: {
+          username: userDetails.username,
+          email: userDetails.email,
+          password: userDetails.password,
+          profile_pic: userDetails.image,
+        },
+      }
+    );
+
+    return result;
+  } catch (error) {
+    console.error("Error editing user:", error);
+    throw error;
+  }
+}
+
+app.put("/users/:userId/update", async (req, res) => {
+  try {
+    const userId = new ObjectId(req.params.userId);
+
+    const result = await editUser(userId, req.body);
+
+    if (result.modifiedCount > 0) {
+      res.status(200).json({ message: "User updated successfully" });
+    } else {
+      res.status(404).json({ message: "User not found" });
+    }
+  } catch (error) {
+    console.error("Failed to edit user:", error);
+    res.status(500).json({ message: "Failed to edit user" });
   }
 });
 // Route to fetch user data based on user ID
