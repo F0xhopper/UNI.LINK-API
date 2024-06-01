@@ -545,7 +545,7 @@ async function editUser(userId, userDetails) {
           username: userDetails.username,
           email: userDetails.email,
           password: userDetails.password,
-          profile_pic: userDetails.image,
+          profile_pic: userDetails.profile_pic,
         },
       }
     );
