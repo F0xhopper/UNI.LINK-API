@@ -11,8 +11,7 @@ app.use(bodyParser.json({ limit: "10mb" }));
 app.use(cors());
 
 // MongoDB connection URI
-const uri =
-  "mongodb+srv://Jasper:1234@cluster0.d8n0tir.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+const uri = process.env.URI_MONGO;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
