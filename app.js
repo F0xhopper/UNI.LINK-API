@@ -15,8 +15,11 @@ const uri = process.env.URI_MONGO;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
+  ssl: true,
+  tlsAllowInvalidCertificates: true,
   serverApi: {
     version: ServerApiVersion.v1,
+    tlsAllowInvalidCertificates: true,
     strict: true,
     deprecationErrors: true,
   },
