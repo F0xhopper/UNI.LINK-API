@@ -16,7 +16,7 @@ Usage
 
 Clone repo:
 
-git clone [<repository-url>](https://github.com/F0xhopper/UNI.LINK-API)
+git clone https://github.com/F0xhopper/UNI.LINK-API
 cd UNI.LINK-API
 
 Install dependencies:
